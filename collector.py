@@ -129,7 +129,11 @@ df = get_data(target_stock)
 
 if not df.empty:
 
-    df["created_at"] = pd.to_datetime(df["created_at"])
+    df["created_at"] = (
+        pd.to_datetime(df["created_at"])
+        .dt.tz_localize("UTC")
+        .dt.tz_convert("Asia/Seoul")
+    )
 
     candle = df.resample("1min", on="created_at").agg(
         {"price": ["first", "max", "min", "last", "count"]}
