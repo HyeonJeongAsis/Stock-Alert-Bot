@@ -3,7 +3,12 @@ import pymysql
 import time
 import requests
 
-# RDS 및 접속 정보는 기존 설정 유지
+# ======================
+# 설정
+# ======================
+
+ENABLE_ALERT = True
+
 DB_CONFIG = {
     "host": "database-1.cqkity0bvpvd.us-east-1.rds.amazonaws.com",
     "user": "admin",
@@ -11,11 +16,58 @@ DB_CONFIG = {
     "db": "stock_db",
 }
 
-# 감시할 종목 리스트와 목표가 설정
 WATCH_LIST = {
-    "005930.KS": 180000,  # 삼성전자
-    "042660.KS": 150000,  # 한화오션 (예시 목표가)
+    "005930.KS": 180000,
+    "042660.KS": 150000,
 }
+
+# ======================
+# DB 연결
+# ======================
+
+
+def db_conn():
+    return pymysql.connect(**DB_CONFIG)
+
+
+# ======================
+# 알람 상태 가져오기
+# ======================
+
+
+def get_alert_state(ticker):
+    conn = db_conn()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT alerted FROM alert_status WHERE ticker=%s", (ticker,)
+            )
+            result = cursor.fetchone()
+            return result[0] if result else False
+    finally:
+        conn.close()
+
+
+# ======================
+# 알람 상태 저장
+# ======================
+
+
+def set_alert_state(ticker, state):
+    conn = db_conn()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE alert_status SET alerted=%s WHERE ticker=%s", (state, ticker)
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ======================
+# 가격 가져오기
+# ======================
 
 
 def get_current_price(ticker):
@@ -26,13 +78,13 @@ def get_current_price(ticker):
     return None
 
 
-def send_discord(msg):
-    webhook_url = "https://discordapp.com/api/webhooks/1473898810391396480/w823-4YaAKf5J9u_2xxMYtjqd31IHAL10aqI8Xq7xVL0ciwC5DX5dFDivMFf9n7lIluz"
-    requests.post(webhook_url, json={"content": msg})
+# ======================
+# DB 저장
+# ======================
 
 
 def save_to_db(ticker, price):
-    conn = pymysql.connect(**DB_CONFIG)
+    conn = db_conn()
     try:
         with conn.cursor() as cursor:
             sql = "INSERT INTO stock_prices (ticker, price) VALUES (%s, %s)"
@@ -42,18 +94,50 @@ def save_to_db(ticker, price):
         conn.close()
 
 
+# ======================
+# Discord
+# ======================
+
+
+def send_discord(msg):
+    webhook_url = "YOUR_WEBHOOK"
+    requests.post(webhook_url, json={"content": msg})
+
+
+# ======================
 # 메인 루프
+# ======================
+
+print("🔥 REAL TRADING BOT STARTED")
+
 while True:
+
     for ticker, target_price in WATCH_LIST.items():
+
         try:
-            current_price = get_current_price(ticker)
-            if current_price:
-                save_to_db(ticker, current_price)
-                print(f"[{ticker}] 현재가: {current_price}")
+            price = get_current_price(ticker)
 
-                if current_price >= target_price:
-                    send_discord(f"🚨 {ticker} 목표가 달성! 현재가: {current_price}")
+            if price:
+
+                save_to_db(ticker, price)
+
+                alerted = get_alert_state(ticker)
+
+                if ENABLE_ALERT:
+
+                    if price >= target_price and not alerted:
+
+                        send_discord(f"🚨 {ticker} 목표가 돌파!\n현재가: {price}")
+
+                        set_alert_state(ticker, True)
+
+                    elif price < target_price:
+
+                        set_alert_state(ticker, False)
+
+                print(ticker, price)
+
         except Exception as e:
-            print(f"{ticker} 에러 발생: {e}")
+            print("ERROR:", e)
 
-    time.sleep(60)  # 1분마다 전체 종목 갱신
+    time.sleep(60)
