@@ -9,9 +9,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -19,29 +16,27 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # 1. 권한 설정 및 폴더 이동
-            sudo chown -R ubuntu:ubuntu /home/ubuntu
+
             cd /home/ubuntu
 
-            # 2. 기존 폴더 삭제 후 재클론 (가장 깔끔함)
-            rm -rf Stock-Alert-Bot
-            git clone https://github.com/HyeonJeongAsis/Stock-Alert-Bot.git
+            # 처음이면 clone, 아니면 pull
+            if [ ! -d "Stock-Alert-Bot" ]; then
+              git clone https://github.com/HyeonJeongAsis/Stock-Alert-Bot.git
+            else
+              cd Stock-Alert-Bot
+              git pull origin main
+              cd ..
+            fi
+
             cd Stock-Alert-Bot
 
-            # 3. 가상환경 설정 및 라이브러리 설치 (이미 설치된 건 건너뜀)
             python3 -m venv venv
             source venv/bin/activate
+
             pip install --upgrade pip
-            pip install yfinance pymysql streamlit pandas requests --quiet
+            pip install yfinance pymysql streamlit pandas requests
 
-            # 4. 기존 프로세스 종료
-            sudo pkill -f collector.py || true
-            sudo pkill -f streamlit || true
+            sudo systemctl restart stockbot
+            sudo systemctl restart streamlit
 
-            # 5. 백그라운드 실행 (disown 추가로 세션 분리)
-            nohup venv/bin/python3 collector.py > collector.log 2>&1 &
-            nohup venv/bin/streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true > streamlit.log 2>&1 &
-            
-            # 6. 깃허브 액션에 성공 신호 보내기
-            sleep 3
             echo "Deployment finished successfully!"
