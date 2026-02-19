@@ -1,0 +1,39 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 폴더가 없으면 생성하고 이동
+            if [ ! -d "/home/ubuntu/Stock-Alert-Bot" ]; then
+              git clone https://github.com/HyeonJeongAsis/Stock-Alert-Bot.git /home/ubuntu/Stock-Alert-Bot
+            fi
+            cd /home/ubuntu/Stock-Alert-Bot
+            git pull origin main
+            
+            # 파이썬 환경 설정
+            python3 -m venv venv || true
+            source venv/bin/activate
+            pip install -r requirements.txt
+            
+            # 기존 프로세스 종료 및 재실행
+            pkill -f collector.py || true
+            pkill -f streamlit || true
+            
+            nohup venv/bin/python3 collector.py > collector.log 2>&1 &
+            nohup venv/bin/streamlit run app.py --server.port 8501 --server.address 0.0.0.0 > streamlit.log 2>&1 &
