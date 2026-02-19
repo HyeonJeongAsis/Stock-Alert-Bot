@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="HTS PRO", layout="wide")
 
-st.title("🔥Let's GO!")
+st.title("🔥 Let's GO HTS PRO")
 
 DB_CONFIG = {
     "host": "database-1.cqkity0bvpvd.us-east-1.rds.amazonaws.com",
@@ -19,16 +19,22 @@ DB_CONFIG = {
     "db": "stock_db",
 }
 
+# 종목 이름 매핑
 TICKER_NAMES = {"005930.KS": "삼성전자", "042660.KS": "한화오션"}
 
+NAME_TO_TICKER = {v: k for k, v in TICKER_NAMES.items()}
+
 # ======================
-# DB
+# DB 함수
 # ======================
+
+
+def db_conn():
+    return pymysql.connect(**DB_CONFIG)
 
 
 def get_data(ticker):
-
-    conn = pymysql.connect(**DB_CONFIG)
+    conn = db_conn()
 
     query = f"""
     SELECT *
@@ -40,21 +46,54 @@ def get_data(ticker):
 
     df = pd.read_sql(query, conn)
     conn.close()
-
     return df
+
+
+# 🔥 글로벌 알람 상태
+
+
+def get_global_alert():
+    conn = db_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT alert_enabled FROM bot_settings LIMIT 1")
+    result = cursor.fetchone()
+    conn.close()
+    return bool(result[0])
+
+
+def set_global_alert(state):
+    conn = db_conn()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE bot_settings SET alert_enabled=%s WHERE id=1", (state,))
+    conn.commit()
+    conn.close()
 
 
 # ======================
 # Sidebar
 # ======================
 
-st.sidebar.header("종목")
+st.sidebar.header("📊 종목 선택")
 
-target_stock = st.sidebar.selectbox("Select", list(TICKER_NAMES.keys()))
+# 🔥 이름으로 선택
+selected_name = st.sidebar.selectbox("종목", list(NAME_TO_TICKER.keys()))
 
-realtime = st.sidebar.checkbox("실시간 모드", True)
+target_stock = NAME_TO_TICKER[selected_name]
+stock_name = selected_name
 
-stock_name = TICKER_NAMES[target_stock]
+realtime = st.sidebar.checkbox("🔥 실시간 모드", True)
+
+# 🔥 알람 컨트롤
+st.sidebar.markdown("---")
+st.sidebar.subheader("🚨 ALERT CONTROL")
+
+alert_state = get_global_alert()
+
+new_alert = st.sidebar.toggle("알람 ON/OFF", value=alert_state)
+
+if new_alert != alert_state:
+    set_global_alert(new_alert)
+    st.sidebar.success("알람 상태 변경됨")
 
 # ======================
 # 데이터
@@ -73,7 +112,6 @@ if not df.empty:
     candle.columns = ["open", "high", "low", "close", "volume"]
     candle = candle.dropna()
 
-    # 이동평균선
     candle["ma5"] = candle["close"].rolling(5).mean()
     candle["ma20"] = candle["close"].rolling(20).mean()
     candle["ma60"] = candle["close"].rolling(60).mean()
@@ -124,15 +162,12 @@ if not df.empty:
         )
     )
 
-    # 이동평균선
     fig.add_trace(go.Scatter(x=candle.index, y=candle.ma5, name="MA5"))
     fig.add_trace(go.Scatter(x=candle.index, y=candle.ma20, name="MA20"))
     fig.add_trace(go.Scatter(x=candle.index, y=candle.ma60, name="MA60"))
 
-    # Y축 압축
     high = candle.high.tail(100).max()
     low = candle.low.tail(100).min()
-
     pad = (high - low) * 0.2
 
     fig.update_layout(
@@ -144,20 +179,13 @@ if not df.empty:
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # ======================
     # 거래량
-    # ======================
-
     vol_fig = go.Figure()
-
     vol_fig.add_bar(x=candle.index, y=candle.volume)
-
     vol_fig.update_layout(template="plotly_dark", height=200)
-
     st.plotly_chart(vol_fig, use_container_width=True)
 
-    # Raw
-    with st.expander("체결 데이터"):
+    with st.expander("📑 체결 데이터"):
         st.dataframe(df)
 
 else:
