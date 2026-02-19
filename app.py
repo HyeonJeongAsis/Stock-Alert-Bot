@@ -7,7 +7,6 @@ st.set_page_config(page_title="Stock-Watch Dashboard", layout="wide")
 st.title("📈 Stock-Watch 실시간 대시보드")
 
 # DB 접속 설정 (collector.py와 동일하게 설정)
-# DB 접속 설정 (collector.py와 완전히 동일하게!)
 DB_CONFIG = {
     "host": "database-1.cqkity0bvpvd.us-east-1.rds.amazonaws.com",
     "user": "admin",

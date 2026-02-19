@@ -13,7 +13,7 @@ DB_CONFIG = {
 
 # 감시할 종목 리스트와 목표가 설정
 WATCH_LIST = {
-    "005930.KS": 200000,  # 삼성전자
+    "005930.KS": 180000,  # 삼성전자
     "042660.KS": 150000,  # 한화오션 (예시 목표가)
 }
 
@@ -27,7 +27,7 @@ def get_current_price(ticker):
 
 
 def send_discord(msg):
-    webhook_url = "YOUR_DISCORD_WEBHOOK_URL"
+    webhook_url = "https://discordapp.com/api/webhooks/1473898810391396480/w823-4YaAKf5J9u_2xxMYtjqd31IHAL10aqI8Xq7xVL0ciwC5DX5dFDivMFf9n7lIluz"
     requests.post(webhook_url, json={"content": msg})
 
 
