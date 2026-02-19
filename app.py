@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="HTS PRO", layout="wide")
 
-st.title("🔥 HTS PRO Dashboard")
+st.title("🔥Let's GO!")
 
 DB_CONFIG = {
     "host": "database-1.cqkity0bvpvd.us-east-1.rds.amazonaws.com",
