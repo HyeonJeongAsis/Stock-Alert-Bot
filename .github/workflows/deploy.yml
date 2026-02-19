@@ -19,9 +19,9 @@ jobs:
 
             cd /home/ubuntu
 
-            # 처음이면 clone, 아니면 pull
+            # 처음이면 clone, 아니면 pull!
             if [ ! -d "Stock-Alert-Bot" ]; then
-              git clone https://github.com/HyeonJeongAsis/Stock-Alert-Bot.git
+              git pull https://github.com/HyeonJeongAsis/Stock-Alert-Bot.git
             else
               cd Stock-Alert-Bot
               git pull origin main
