@@ -1,0 +1,5 @@
+yfinance
+pymysql
+streamlit
+pandas
+requests
