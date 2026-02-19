@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="HTS PRO", layout="wide")
 
-st.title("🔥 Let's GO HTS PRO")
+st.title("🔥 Let's GO! ")
 
 DB_CONFIG = {
     "host": "database-1.cqkity0bvpvd.us-east-1.rds.amazonaws.com",
@@ -19,13 +19,15 @@ DB_CONFIG = {
     "db": "stock_db",
 }
 
-# 종목 이름 매핑
-TICKER_NAMES = {"005930.KS": "삼성전자", "042660.KS": "한화오션"}
+TICKER_NAMES = {
+    "005930.KS": "삼성전자",
+    "042660.KS": "한화오션",
+}
 
 NAME_TO_TICKER = {v: k for k, v in TICKER_NAMES.items()}
 
 # ======================
-# DB 함수
+# DB
 # ======================
 
 
@@ -33,38 +35,48 @@ def db_conn():
     return pymysql.connect(**DB_CONFIG)
 
 
+@st.cache_data(ttl=10)
 def get_data(ticker):
+
     conn = db_conn()
 
-    query = f"""
+    query = """
     SELECT *
     FROM stock_prices
-    WHERE ticker='{ticker}'
+    WHERE ticker=%s
     ORDER BY created_at DESC
     LIMIT 1000
     """
 
-    df = pd.read_sql(query, conn)
+    df = pd.read_sql(query, conn, params=(ticker,))
     conn.close()
+
     return df
 
 
-# 🔥 글로벌 알람 상태
-
-
 def get_global_alert():
+
     conn = db_conn()
     cursor = conn.cursor()
+
     cursor.execute("SELECT alert_enabled FROM bot_settings LIMIT 1")
     result = cursor.fetchone()
+
     conn.close()
+
     return bool(result[0])
 
 
 def set_global_alert(state):
+
     conn = db_conn()
     cursor = conn.cursor()
-    cursor.execute("UPDATE bot_settings SET alert_enabled=%s WHERE id=1", (state,))
+
+    cursor.execute(
+        "UPDATE bot_settings SET alert_enabled=%s WHERE id=1",
+        (state,),
+    )
+
     conn.commit()
     conn.close()
 
@@ -75,21 +87,29 @@ def set_global_alert(state):
 
 st.sidebar.header("📊 종목 선택")
 
-# 🔥 이름으로 선택
-selected_name = st.sidebar.selectbox("종목", list(NAME_TO_TICKER.keys()))
+selected_name = st.sidebar.selectbox(
+    "종목",
+    list(NAME_TO_TICKER.keys()),
+)
 
 target_stock = NAME_TO_TICKER[selected_name]
 stock_name = selected_name
 
 realtime = st.sidebar.checkbox("🔥 실시간 모드", True)
 
-# 🔥 알람 컨트롤
+# ======================
+# ALERT CONTROL (DB Sync 방식)
+# ======================
+
 st.sidebar.markdown("---")
 st.sidebar.subheader("🚨 ALERT CONTROL")
 
 alert_state = get_global_alert()
 
-new_alert = st.sidebar.toggle("알람 ON/OFF", value=alert_state)
+new_alert = st.sidebar.toggle(
+    "알람 ON/OFF",
+    value=alert_state,
+)
 
 if new_alert != alert_state:
     set_global_alert(new_alert)
@@ -103,7 +123,10 @@ df = get_data(target_stock)
 
 if not df.empty:
 
-    df["created_at"] = pd.to_datetime(df["created_at"])
+    # 🔥 한국시간 강제 변환 (완벽 방식)
+    df["created_at"] = pd.to_datetime(df["created_at"], utc=True).dt.tz_convert(
+        "Asia/Seoul"
+    )
 
     candle = df.resample("1min", on="created_at").agg(
         {"price": ["first", "max", "min", "last", "count"]}
@@ -125,10 +148,6 @@ if not df.empty:
     color = "red" if change >= 0 else "blue"
     arrow = "▲" if change >= 0 else "▼"
 
-    # ======================
-    # HTS Header
-    # ======================
-
     col1, col2, col3 = st.columns([4, 1, 1])
 
     with col1:
@@ -136,18 +155,17 @@ if not df.empty:
 
     with col2:
         st.markdown(
-            f"<h1 style='color:{color}'>{latest:,.0f}</h1>", unsafe_allow_html=True
+            f"<h1 style='color:{color}'>{latest:,.0f}</h1>",
+            unsafe_allow_html=True,
         )
 
     with col3:
         st.markdown(
-            f"<h2 style='color:{color}'>{arrow} {pct:.2f}%</h2>", unsafe_allow_html=True
+            f"<h2 style='color:{color}'>{arrow} {pct:.2f}%</h2>",
+            unsafe_allow_html=True,
         )
 
-    # ======================
     # 캔들차트
-    # ======================
-
     fig = go.Figure()
 
     fig.add_trace(
@@ -168,6 +186,7 @@ if not df.empty:
 
     high = candle.high.tail(100).max()
     low = candle.low.tail(100).min()
+
     pad = (high - low) * 0.2
 
     fig.update_layout(
@@ -183,6 +202,7 @@ if not df.empty:
     vol_fig = go.Figure()
     vol_fig.add_bar(x=candle.index, y=candle.volume)
     vol_fig.update_layout(template="plotly_dark", height=200)
+
     st.plotly_chart(vol_fig, use_container_width=True)
 
     with st.expander("📑 체결 데이터"):
@@ -192,7 +212,7 @@ else:
     st.warning("데이터 없음")
 
 # ======================
-# auto refresh
+# AUTO REFRESH
 # ======================
 
 if realtime:
