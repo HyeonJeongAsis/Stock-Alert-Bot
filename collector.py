@@ -1,11 +1,16 @@
-import yfinance as yf
+import streamlit as st
+import pandas as pd
 import pymysql
 import time
-import requests
+import plotly.graph_objects as go
 
 # ======================
-# DB 설정
+# 설정
 # ======================
+
+st.set_page_config(page_title="HTS PRO", layout="wide")
+
+st.title("🔥 Let's GO HTS PRO")
 
 DB_CONFIG = {
     "host": "database-1.cqkity0bvpvd.us-east-1.rds.amazonaws.com",
@@ -14,15 +19,15 @@ DB_CONFIG = {
     "db": "stock_db",
 }
 
-WATCH_LIST = {
-    "005930.KS": 180000,
-    "042660.KS": 150000,
+TICKER_NAMES = {
+    "005930.KS": "삼성전자",
+    "042660.KS": "한화오션",
 }
 
-WEBHOOK_URL = "YOUR_WEBHOOK"
+NAME_TO_TICKER = {v: k for k, v in TICKER_NAMES.items()}
 
 # ======================
-# DB 연결
+# DB
 # ======================
 
 
@@ -30,131 +35,191 @@ def db_conn():
     return pymysql.connect(**DB_CONFIG)
 
 
-# ======================
-# 글로벌 알람 ON/OFF (웹에서 제어)
-# ======================
+@st.cache_data(ttl=10)
+def get_data(ticker):
 
-
-def is_alert_enabled():
     conn = db_conn()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT alert_enabled FROM bot_settings LIMIT 1")
-            result = cursor.fetchone()
-            return result[0] if result else False
-    finally:
-        conn.close()
+
+    query = """
+    SELECT *
+    FROM stock_prices
+    WHERE ticker=%s
+    ORDER BY created_at DESC
+    LIMIT 1000
+    """
+
+    df = pd.read_sql(query, conn, params=(ticker,))
+    conn.close()
+
+    return df
 
 
-# ======================
-# 종목별 알람 상태
-# ======================
+def get_global_alert():
 
-
-def get_alert_state(ticker):
     conn = db_conn()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                "SELECT alerted FROM alert_status WHERE ticker=%s", (ticker,)
-            )
-            result = cursor.fetchone()
-            return result[0] if result else False
-    finally:
-        conn.close()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT alert_enabled FROM bot_settings LIMIT 1")
+    result = cursor.fetchone()
+
+    conn.close()
+
+    return bool(result[0])
 
 
-def set_alert_state(ticker, state):
+def set_global_alert(state):
+
     conn = db_conn()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                "UPDATE alert_status SET alerted=%s WHERE ticker=%s",
-                (state, ticker),
-            )
-        conn.commit()
-    finally:
-        conn.close()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "UPDATE bot_settings SET alert_enabled=%s WHERE id=1",
+        (state,),
+    )
+
+    conn.commit()
+    conn.close()
 
 
 # ======================
-# 가격 가져오기
+# Sidebar
 # ======================
 
+st.sidebar.header("📊 종목 선택")
 
-def get_current_price(ticker):
-    stock = yf.Ticker(ticker)
-    data = stock.history(period="1d", interval="1m")
-    if not data.empty:
-        return data["Close"].iloc[-1]
-    return None
+selected_name = st.sidebar.selectbox(
+    "종목",
+    list(NAME_TO_TICKER.keys()),
+)
 
+target_stock = NAME_TO_TICKER[selected_name]
+stock_name = selected_name
 
-# ======================
-# DB 저장
-# ======================
-
-
-def save_to_db(ticker, price):
-    conn = db_conn()
-    try:
-        with conn.cursor() as cursor:
-            sql = "INSERT INTO stock_prices (ticker, price) VALUES (%s, %s)"
-            cursor.execute(sql, (ticker, price))
-        conn.commit()
-    finally:
-        conn.close()
-
+realtime = st.sidebar.checkbox("🔥 실시간 모드", True)
 
 # ======================
-# Discord 알람
+# ALERT CONTROL
 # ======================
 
+st.sidebar.markdown("---")
+st.sidebar.subheader("🚨 ALERT CONTROL")
 
-def send_discord(msg):
-    requests.post(WEBHOOK_URL, json={"content": msg})
+# 최초 한번만 DB에서 가져오기
+if "alert_state" not in st.session_state:
+    st.session_state.alert_state = get_global_alert()
 
+new_alert = st.sidebar.toggle(
+    "알람 ON/OFF",
+    value=st.session_state.alert_state,
+)
+
+if new_alert != st.session_state.alert_state:
+
+    set_global_alert(new_alert)
+
+    st.session_state.alert_state = new_alert
+
+    st.sidebar.success("알람 상태 변경됨")
 
 # ======================
-# MAIN LOOP
+# 데이터
 # ======================
 
-print("🔥 REAL TRADING BOT STARTED")
+df = get_data(target_stock)
 
-while True:
+if not df.empty:
 
-    try:
+    df["created_at"] = pd.to_datetime(df["created_at"])
 
-        # 🔥 웹에서 알람 OFF 하면 여기서 차단
-        if not is_alert_enabled():
-            print("🚫 ALERT OFF (웹에서 비활성화됨)")
+    candle = df.resample("1min", on="created_at").agg(
+        {"price": ["first", "max", "min", "last", "count"]}
+    )
 
-        for ticker, target_price in WATCH_LIST.items():
+    candle.columns = ["open", "high", "low", "close", "volume"]
+    candle = candle.dropna()
 
-            price = get_current_price(ticker)
+    candle["ma5"] = candle["close"].rolling(5).mean()
+    candle["ma20"] = candle["close"].rolling(20).mean()
+    candle["ma60"] = candle["close"].rolling(60).mean()
 
-            if price:
+    latest = candle["close"].iloc[-1]
+    prev = candle["close"].iloc[-2]
 
-                save_to_db(ticker, price)
+    change = latest - prev
+    pct = (change / prev) * 100
 
-                print(f"{ticker} {price}")
+    color = "red" if change >= 0 else "blue"
+    arrow = "▲" if change >= 0 else "▼"
 
-                # 글로벌 알람 ON일 때만 실행
-                if is_alert_enabled():
+    col1, col2, col3 = st.columns([4, 1, 1])
 
-                    alerted = get_alert_state(ticker)
+    with col1:
+        st.markdown(f"## {stock_name} ({target_stock})")
 
-                    if price >= target_price and not alerted:
+    with col2:
+        st.markdown(
+            f"<h1 style='color:{color}'>{latest:,.0f}</h1>",
+            unsafe_allow_html=True,
+        )
 
-                        send_discord(f"🚨 {ticker} 목표가 돌파!\n현재가: {price}")
+    with col3:
+        st.markdown(
+            f"<h2 style='color:{color}'>{arrow} {pct:.2f}%</h2>",
+            unsafe_allow_html=True,
+        )
 
-                        set_alert_state(ticker, True)
+    # 캔들차트
 
-                    elif price < target_price:
+    fig = go.Figure()
 
-                        set_alert_state(ticker, False)
+    fig.add_trace(
+        go.Candlestick(
+            x=candle.index,
+            open=candle.open,
+            high=candle.high,
+            low=candle.low,
+            close=candle.close,
+            increasing_line_color="red",
+            decreasing_line_color="blue",
+        )
+    )
 
-    except Exception as e:
-        print("ERROR:", e)
+    fig.add_trace(go.Scatter(x=candle.index, y=candle.ma5, name="MA5"))
+    fig.add_trace(go.Scatter(x=candle.index, y=candle.ma20, name="MA20"))
+    fig.add_trace(go.Scatter(x=candle.index, y=candle.ma60, name="MA60"))
 
+    high = candle.high.tail(100).max()
+    low = candle.low.tail(100).min()
+
+    pad = (high - low) * 0.2
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=600,
+        xaxis_rangeslider_visible=False,
+        yaxis=dict(range=[low - pad, high + pad]),
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 거래량
+
+    vol_fig = go.Figure()
+    vol_fig.add_bar(x=candle.index, y=candle.volume)
+    vol_fig.update_layout(template="plotly_dark", height=200)
+
+    st.plotly_chart(vol_fig, use_container_width=True)
+
+    with st.expander("📑 체결 데이터"):
+        st.dataframe(df)
+
+else:
+    st.warning("데이터 없음")
+
+# ======================
+# AUTO REFRESH
+# ======================
+
+if realtime:
     time.sleep(60)
+    st.rerun()
