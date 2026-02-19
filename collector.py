@@ -4,10 +4,8 @@ import time
 import requests
 
 # ======================
-# 설정
+# DB 설정
 # ======================
-
-ENABLE_ALERT = True
 
 DB_CONFIG = {
     "host": "database-1.cqkity0bvpvd.us-east-1.rds.amazonaws.com",
@@ -21,6 +19,8 @@ WATCH_LIST = {
     "042660.KS": 150000,
 }
 
+WEBHOOK_URL = "YOUR_WEBHOOK"
+
 # ======================
 # DB 연결
 # ======================
@@ -31,7 +31,23 @@ def db_conn():
 
 
 # ======================
-# 알람 상태 가져오기
+# 글로벌 알람 ON/OFF (웹에서 제어)
+# ======================
+
+
+def is_alert_enabled():
+    conn = db_conn()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT alert_enabled FROM bot_settings LIMIT 1")
+            result = cursor.fetchone()
+            return result[0] if result else False
+    finally:
+        conn.close()
+
+
+# ======================
+# 종목별 알람 상태
 # ======================
 
 
@@ -48,17 +64,13 @@ def get_alert_state(ticker):
         conn.close()
 
 
-# ======================
-# 알람 상태 저장
-# ======================
-
-
 def set_alert_state(ticker, state):
     conn = db_conn()
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                "UPDATE alert_status SET alerted=%s WHERE ticker=%s", (state, ticker)
+                "UPDATE alert_status SET alerted=%s WHERE ticker=%s",
+                (state, ticker),
             )
         conn.commit()
     finally:
@@ -95,35 +107,42 @@ def save_to_db(ticker, price):
 
 
 # ======================
-# Discord
+# Discord 알람
 # ======================
 
 
 def send_discord(msg):
-    webhook_url = "YOUR_WEBHOOK"
-    requests.post(webhook_url, json={"content": msg})
+    requests.post(WEBHOOK_URL, json={"content": msg})
 
 
 # ======================
-# 메인 루프
+# MAIN LOOP
 # ======================
 
 print("🔥 REAL TRADING BOT STARTED")
 
 while True:
 
-    for ticker, target_price in WATCH_LIST.items():
+    try:
 
-        try:
+        # 🔥 웹에서 알람 OFF 하면 여기서 차단
+        if not is_alert_enabled():
+            print("🚫 ALERT OFF (웹에서 비활성화됨)")
+
+        for ticker, target_price in WATCH_LIST.items():
+
             price = get_current_price(ticker)
 
             if price:
 
                 save_to_db(ticker, price)
 
-                alerted = get_alert_state(ticker)
+                print(f"{ticker} {price}")
 
-                if ENABLE_ALERT:
+                # 글로벌 알람 ON일 때만 실행
+                if is_alert_enabled():
+
+                    alerted = get_alert_state(ticker)
 
                     if price >= target_price and not alerted:
 
@@ -135,9 +154,7 @@ while True:
 
                         set_alert_state(ticker, False)
 
-                print(ticker, price)
-
-        except Exception as e:
-            print("ERROR:", e)
+    except Exception as e:
+        print("ERROR:", e)
 
     time.sleep(60)
