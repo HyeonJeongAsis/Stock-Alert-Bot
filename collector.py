@@ -8,7 +8,7 @@ DB_CONFIG = {
     "host": "database-1.cqkity0bvpvd.us-east-1.rds.amazonaws.com",
     "user": "admin",
     "password": "mysqlmysql",
-    "db": "StockDB",
+    "db": "stock_db",
 }
 
 # 감시할 종목 리스트와 목표가 설정
