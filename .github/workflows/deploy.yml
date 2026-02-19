@@ -21,7 +21,7 @@ jobs:
 
             # 처음이면 clone, 아니면 pull!
             if [ ! -d "Stock-Alert-Bot" ]; then
-              git pull https://github.com/HyeonJeongAsis/Stock-Alert-Bot.git
+              git clone https://github.com/HyeonJeongAsis/Stock-Alert-Bot.git
             else
               cd Stock-Alert-Bot
               git pull origin main
