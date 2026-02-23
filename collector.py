@@ -19,7 +19,7 @@ WATCH_LIST = {
     "042660.KS": 150000,
 }
 
-WEBHOOK = "..https://discordapp.com/api/webhooks/1473898810391396480/w823-4YaAKf5J9u_2xxMYtjqd31IHAL10aqI8Xq7xVL0ciwC5DX5dFDivMFf9n7lIluz"
+WEBHOOK = "https://discordapp.com/api/webhooks/1473898810391396480/w823-4YaAKf5J9u_2xxMYtjqd31IHAL10aqI8Xq7xVL0ciwC5DX5dFDivMFf9n7lIluz"
 
 # ======================
 # DB
