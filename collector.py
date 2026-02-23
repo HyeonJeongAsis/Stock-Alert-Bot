@@ -41,6 +41,7 @@ def get_global_alert():
     conn.close()
 
     return bool(result[0])
+    
 
 
 # ======================
