@@ -34,7 +34,7 @@ jobs:
             source venv/bin/activate
 
             pip install --upgrade pip
-            pip install yfinance pymysql streamlit pandas requests
+            pip install yfinance pymysql streamlit pandas requests cryptography
             pip install plotly streamlit-autorefresh
 
 
