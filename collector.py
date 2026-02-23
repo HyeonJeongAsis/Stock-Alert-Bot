@@ -15,11 +15,11 @@ DB_CONFIG = {
 }
 
 WATCH_LIST = {
-    "005930.KS": 180000,
+    "005930.KS": 190000,
     "042660.KS": 150000,
 }
 
-WEBHOOK = "YOUR_WEBHOOK"
+WEBHOOK = "https://discordapp.com/api/webhooks/1473898810391396480/w823-4YaAKf5J9u_2xxMYtjqd31IHAL10aqI8Xq7xVL0ciwC5DX5dFDivMFf9n7lIluz"
 
 # ======================
 # DB
@@ -31,17 +31,19 @@ def db_conn():
 
 
 def get_global_alert():
+    try:
+        conn = db_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT alert_enabled FROM bot_settings WHERE id=1")
+        result = cursor.fetchone()
+        conn.close()
 
-    conn = db_conn()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT alert_enabled FROM bot_settings LIMIT 1")
-    result = cursor.fetchone()
-
-    conn.close()
-
-    return bool(result[0])
-    
+        if result:
+            return bool(result[0])
+        return False  # 데이터가 없으면 기본값 False
+    except Exception as e:
+        print(f"DB Alert Check Error: {e}")
+        return False
 
 
 # ======================
