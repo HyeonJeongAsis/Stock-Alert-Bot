@@ -22,4 +22,12 @@
 
 ## 📊 프로젝트 발표 자료 (Google Slides)
 
-<iframe src="https://docs.google.com/presentation/d/e/2PACX-1vSRaoJsz9Y-MksAKQ-IrFIFFAf4ukRBxVXwXm3UlyzriYu5d3196b8Fd1SAco1FLKF33eYgvASO07pV/pubembed?start=true&loop=true&delayms=3000" frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+<p align="center">
+  <a href="https://docs.google.com/presentation/d/e/2PACX-1vSRaoJsz9Y-MksAKQ-IrFIFFAf4ukRBxVXwXm3UlyzriYu5d3196b8Fd1SAco1FLKF33eYgvASO07pV/pub">
+    <img src="https://img.shields.io/badge/Check%20Presentation-Click%20Here-orange?style=for-the-badge&logo=googleslides" alt="Google Slides" />
+    <br>
+    <img src="https://via.placeholder.com/800x450.png?text=Stock-Watch+Presentation+Slide+Screenshot" alt="Stock-Watch Presentation" width="800">
+  </a>
+  <br>
+  <em>👆 위 이미지를 클릭하면 Google Slides 발표 자료로 이동합니다.</em>
+</p>
