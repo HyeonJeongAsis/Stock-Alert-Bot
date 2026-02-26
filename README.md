@@ -29,5 +29,4 @@
     <img src="https://via.placeholder.com/800x450.png?text=Stock-Watch+Presentation+Slide+Screenshot" alt="Stock-Watch Presentation" width="800">
   </a>
   <br>
-  <em>👆 위 이미지를 클릭하면 Google Slides 발표 자료로 이동합니다.</em>
 </p>
