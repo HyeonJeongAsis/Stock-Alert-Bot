@@ -19,3 +19,7 @@
 * **데이터 수집 전략**: 증권사 API의 복잡한 보안 인증 대신, 범용성이 높고 리눅스 환경에서 안정적인 `yfinance`를 활용하여 시스템 구축.
 * **학생 계정 환경 최적화**: AWS Academy의 제한된 프리티어 리소스(t3.micro) 내에서 안정적인 운영을 위해 경량화된 Python 스크립트 작성.
 * **보안 강화**: DB 접속 정보 및 Discord Webhook URL을 GitHub Actions의 `Secrets`로 관리하여 소스코드 유출 방지.
+
+<p align="center">
+  <iframe src="https://docs.google.com/presentation/d/e/21PACX-1v.../embed?start=false&loop=false&delayms=3000" frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+</p>
